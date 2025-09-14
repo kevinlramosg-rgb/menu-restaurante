@@ -1,0 +1,139 @@
+<!--
+  Archivo: menu-restaurante.html
+  Versión con botón de pedido por WhatsApp en cada plato.
+-->
+
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Menú - Restaurante CHERRY</title>
+  <style>
+    :root{--accent:#c94c4c;--muted:#6b7280;--card:#ffffff;--bg:#f7f7f9}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; margin:0; background:var(--bg); color:#111}
+    header{background:linear-gradient(90deg,#fff 0%, #fff 60%);padding:20px 16px;border-bottom:1px solid #eee}
+    .container{max-width:1000px;margin:0 auto;padding:18px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:52px;height:52px;border-radius:10px;background:linear-gradient(135deg,#f9a8a8,#f97373);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:20px}
+    h1{margin:0;font-size:20px}
+    p.tag{margin:0;color:var(--muted);font-size:13px}
+
+    .controls{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+    input.search{flex:1;min-width:180px;padding:10px 12px;border-radius:8px;border:1px solid #ddd}
+    .categories{display:flex;gap:8px;flex-wrap:wrap}
+    .cat-btn{padding:8px 12px;border-radius:999px;border:1px solid transparent;background:white;cursor:pointer}
+    .cat-btn.active{border-color:var(--accent);box-shadow:0 2px 6px rgba(201,76,76,.08)}
+
+    .menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:18px}
+    .card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(16,24,40,.06);display:flex;gap:12px;align-items:flex-start;flex-direction:column}
+    .thumb{width:80px;height:80px;border-radius:10px;flex:0 0 80px;background:linear-gradient(135deg,#fde68a,#fca5a5);display:flex;align-items:center;justify-content:center;font-weight:700}
+    .info{flex:1;width:100%}
+    .name{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+    .desc{color:var(--muted);font-size:13px;margin-top:6px}
+    .price{font-weight:700;color:var(--accent)}
+    .btn{margin-top:8px;display:inline-block;padding:8px 12px;border-radius:8px;border:none;background:var(--accent);color:white;text-decoration:none;text-align:center;font-size:14px}
+
+    footer{padding:20px 0;text-align:center;color:var(--muted);font-size:13px}
+
+    @media (max-width:420px){.brand h1{font-size:16px}.thumb{width:64px;height:64px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="brand">
+        <div class="logo">CH</div>
+        <div>
+          <h1>CHERRY</h1>
+          <p class="tag">Menú digital • Fácil de editar</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" role="main">
+    <div class="controls" aria-hidden="false">
+      <input class="search" id="search" placeholder="Busca por plato o ingrediente..." aria-label="Buscar en el menú">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn" id="printBtn">Imprimir</button>
+      </div>
+    </div>
+
+    <div class="categories" id="categories" style="margin-top:12px"></div>
+
+    <div id="menuGrid" class="menu-grid" aria-live="polite"></div>
+  </main>
+
+  <footer>
+    <div class="container">¿Quieres personalizar esto con tus platos y precios? Mándame la lista y lo adapto. • Hecho con ❤️</div>
+  </footer>
+
+  <script>
+    // Número de WhatsApp del restaurante
+    const whatsappNumber = "573103714672"; // cámbialo por el tuyo
+
+    // Datos del menú
+    const menuItems = [
+      {id:1, category:'Entradas', name:'Banana Split', desc:'Empanadas fritas rellenas de carne vacuna, cebolla y especias', price:'$15.000'},
+      {id:2, category:'Entradas', name:'Ceviche de camarón', desc:'Camarón fresco en salsa cítrica con cebolla morada', price:'$18.000'},
+      {id:3, category:'Plato fuerte', name:'Ajiaco bogotano', desc:'Sopa tradicional con pollo, papas y mazorca', price:'$22.000'},
+      {id:4, category:'Plato fuerte', name:'Bandeja paisa', desc:'Fríjoles, arroz, chicharrón, huevo, plátano y arepa', price:'$28.000'},
+      {id:5, category:'Postres', name:'Tres leches', desc:'Bizcocho esponjoso bañado en tres tipos de leche', price:'$9.000'},
+      {id:6, category:'Bebidas', name:'Limonada de coco', desc:'Limonada fresca con toque de coco', price:'$6.000'}
+    ];
+
+    // Utilities
+    const uniq = (arr)=>[...new Set(arr)];
+
+    // Render categories
+    const categoriesEl = document.getElementById('categories');
+    const cats = ['Todos',...uniq(menuItems.map(i=>i.category))];
+    let activeCat = 'Todos';
+
+    function makeCatButtons(){
+      categoriesEl.innerHTML = '';
+      cats.forEach(c=>{
+        const b = document.createElement('button');
+        b.textContent = c;
+        b.className = 'cat-btn' + (c===activeCat? ' active':'');
+        b.onclick = ()=>{activeCat=c; document.querySelectorAll('.cat-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render();}
+        categoriesEl.appendChild(b);
+      });
+    }
+
+    // Render menu
+    const grid = document.getElementById('menuGrid');
+    function render(){
+      const q = (document.getElementById('search')?.value||'').toLowerCase().trim();
+      const items = menuItems.filter(it=>{
+        if(activeCat!=='Todos' && it.category!==activeCat) return false;
+        if(!q) return true;
+        return (it.name+ ' ' + (it.desc||'') + ' ' + (it.category||'')).toLowerCase().includes(q);
+      });
+      grid.innerHTML = items.map(it=>{
+        const msg = encodeURIComponent(`Hola, quiero pedir ${it.name}`);
+        const link = `https://wa.me/${whatsappNumber}?text=${msg}`;
+        return `
+          <article class="card">
+            <div class="thumb">${(it.name||'').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()}</div>
+            <div class="info">
+              <div class="name"><span>${it.name}</span><span class="price">${it.price}</span></div>
+              <div class="desc">${it.desc||''}</div>
+              <a href="${link}" target="_blank" class="btn">Pedir por WhatsApp</a>
+            </div>
+          </article>
+        `;
+      }).join('') || '<div style="grid-column:1/-1;color:var(--muted)">No hay platos que coincidan.</div>';
+    }
+
+    // Search
+    document.getElementById('search').addEventListener('input', render);
+    document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+
+    // Inicializa
+    makeCatButtons(); render();
+  </script>
+</body>
+</html>
